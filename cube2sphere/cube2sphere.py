@@ -11,16 +11,15 @@ from .version import __version__
 
 
 def main():
-    _parser = argparse.ArgumentParser(prog='cube2sphere', description='''
-        Maps 6 cube (cubemap, skybox) faces into an equirectangular (cylindrical projection, skysphere) map.
+    _parser = argparse.ArgumentParser(prog='cube2sphere-inv', description='''
+        Maps 6 directional images (from cameras facing each direction) into an equirectangular image for sphere material.
     ''')
     for f in ['front', 'back', 'left', 'right', 'top', 'bottom']:
         _parser.add_argument(f, type=str, metavar='<%s>' % f, help='source %s cube face filename' % f)
     _parser.add_argument('-v', '--version', action='version', version=__version__)
     _parser.add_argument('-r', '--resolution', type=int, nargs=2, default=[1024, 512], metavar=('<width>', '<height>'),
                          help='resolution for rendered map (defaults to 1024x512)')
-    _parser.add_argument('-R', '--rotation', type=int, nargs=3, default=[0, 0, 0], metavar=('<rx>', '<ry>', '<rz>'),
-                         help="rotation in degrees to apply before rendering map (z is up)")
+    # rotationは逆変換用途では不要
     _parser.add_argument('-o', '--output', type=str, default='out', metavar='<path>',
                          help='filename for rendered map (defaults to "out")')
     _parser.add_argument('-f', '--format', type=str, default='TGA', metavar='<name>',
@@ -33,7 +32,10 @@ def main():
                          help='enable verbose logging')
     _args = _parser.parse_args()
 
-    rotations = [math.radians(x) for x in _args.rotation]
+    # 画像フォーマットを自動で大文字化
+    _args.format = _args.format.upper()
+
+    # rotationsは不要
 
     if _args.threads and _args.threads not in list(range(1, 65)):
         _parser.print_usage()
@@ -55,12 +57,11 @@ def main():
         process = subprocess.Popen(
             [_args.blender_path, '-E', 'CYCLES', '--background', '-noaudio',
              '-b', os.path.join(os.path.dirname(os.path.realpath(__file__)), 'projector.blend'),
-             '-o', output, '-F', _args.format, '-x', '1',
+             '-F', _args.format, '-x', '1',
              '-P', os.path.join(os.path.dirname(os.path.realpath(__file__)), 'blender_init.py')]
             + (['-t', str(_args.threads)] if _args.threads else [])
             + ['--', faces[0], faces[1], faces[2], faces[3], faces[4], faces[5],
-               str(_args.resolution[0]), str(_args.resolution[1]),
-               str(rotations[0]), str(rotations[1]), str(rotations[2])],
+               str(_args.resolution[0]), str(_args.resolution[1]), output],
             stderr=out, stdout=out)
     except:
         print('error spawning blender (%s) executable' % _args.blender_path)

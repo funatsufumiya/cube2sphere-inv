@@ -10,20 +10,20 @@ with open(os.path.join(os.path.dirname(__file__), 'README.md')) as fh:
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'cube2sphere', 'version.py')) as version:
     exec (version.read())
 
-setup(name='cube2sphere',
+setup(name='cube2sphere-inv',
       version=__version__,
       description='Utility to map 6 cube (cubemap, skybox) faces into an equirectangular (cylindrical projection, skysphere) map',
       long_description=long_description,
       long_description_content_type='text/markdown',
-      author='Tudor Brindus',
-      author_email='me@tbrindus.ca',
-      url='http://github.com/Xyene/cube2sphere',
+      author='Fumiya Funatsu',
+      author_email='funatsu.fumiya@gmail.com',
+      url='http://github.com/funatsufumiya/cube2sphere-inv',
       packages=find_packages(),
       package_data={
           "cube2sphere": ["*.blend"],
       },
       entry_points={
-          'console_scripts': ['cube2sphere=cube2sphere.cube2sphere:main'],
+          'console_scripts': ['cube2sphere-inv=cube2sphere.cube2sphere:main'],
       },
       classifiers=[
           'Development Status :: 3 - Alpha',
