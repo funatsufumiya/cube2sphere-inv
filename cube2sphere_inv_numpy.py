@@ -2,55 +2,54 @@ import argparse
 import numpy as np
 from PIL import Image
 import os
+from numba import njit
 
 def load_faces(face_paths):
     return {name: np.array(Image.open(path)) for name, path in face_paths.items()}
 
-def direction_to_cube_face(x, y, z):
-    # 6面の法線・u軸・v軸定義
-    faces_def = {
-        'front':  {'normal': np.array([0, 1, 0]), 'u': np.array([1, 0, 0]), 'v': np.array([0, 0, -1])},
-        'back':   {'normal': np.array([0, -1, 0]), 'u': np.array([-1, 0, 0]), 'v': np.array([0, 0, -1])},
-        'right':  {'normal': np.array([1, 0, 0]), 'u': np.array([0, -1, 0]), 'v': np.array([0, 0, -1])},
-        'left':   {'normal': np.array([-1, 0, 0]), 'u': np.array([0, 1, 0]), 'v': np.array([0, 0, -1])},
-        'top':    {'normal': np.array([0, 0, 1]), 'u': np.array([1, 0, 0]), 'v': np.array([0, 1, 0])},
-        'bottom': {'normal': np.array([0, 0, -1]), 'u': np.array([1, 0, 0]), 'v': np.array([0, -1, 0])},
-    }
-    p = np.array([x, y, z])
-    max_dot = -np.inf
-    chosen = None
-    for name, fd in faces_def.items():
-        dot = np.dot(p, fd['normal'])
+# グローバルでfloat64型で定義
+normals = np.array([
+    [0, 1, 0], [0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]
+], dtype=np.float64)
+us = np.array([
+    [1, 0, 0], [-1, 0, 0], [0, -1, 0], [0, 1, 0], [1, 0, 0], [1, 0, 0]
+], dtype=np.float64)
+vs = np.array([
+    [0, 0, -1], [0, 0, -1], [0, 0, -1], [0, 0, -1], [0, -1, 0], [0, 1, 0]
+], dtype=np.float64)
+
+@njit
+def direction_to_cube_face_numba(x, y, z):
+    p = np.array([x, y, z], dtype=np.float64)
+    max_dot = -1e10
+    face_idx = -1
+    for idx in range(6):
+        dot = np.dot(p, normals[idx])
         if dot > max_dot:
             max_dot = dot
-            chosen = (name, fd)
-    face, fd = chosen
-    # 平行投影: 面の中心から見て、pのu/v軸方向の座標を取得
-    u = np.dot(p, fd['u'])
-    v = np.dot(p, fd['v'])
-    # u,v: [-1,1] → [0,1]（球体がぴったり収まる前提）
+            face_idx = idx
+    u = np.dot(p, us[face_idx])
+    v = np.dot(p, vs[face_idx])
     u = (u + 1) / 2
     v = (v + 1) / 2
-    return face, u, v
+    return face_idx, u, v
 
-def equirectangular_from_cubemap(faces, width, height):
+@njit
+def fast_equirectangular_from_cubemap(faces_arr, width, height):
     result = np.zeros((height, width, 3), dtype=np.uint8)
     for j in range(height):
-        theta = np.pi * (j / height)  # 緯度 [0, pi]
+        theta = np.pi * (1 - j / height)
         for i in range(width):
-            phi = 2 * np.pi * (i / width)  # 経度 [0, 2pi]
-            # 球面座標→方向ベクトル
-            x = np.sin(theta) * np.cos(phi)
-            y = np.sin(theta) * np.sin(phi)
-            z = np.cos(theta)
-            # 外側から内側を見たベクトルに変換
-            x, y, z = -x, -y, -z
-            # 方向ベクトル→cube face & face座標
-            face, u, v = direction_to_cube_face(x, y, z)
-            h, w = faces[face].shape[:2]
+            phi = 2 * np.pi * (i / width)
+            x = -np.sin(theta) * np.cos(phi)
+            y = -np.sin(theta) * np.sin(phi)
+            z = -np.cos(theta)
+            face_idx, u, v = direction_to_cube_face_numba(x, y, z)
+            face_img = faces_arr[face_idx]
+            h, w = face_img.shape[:2]
             px = min(max(int(u * w), 0), w - 1)
             py = min(max(int(v * h), 0), h - 1)
-            result[j, i] = faces[face][py, px][:3]
+            result[j, i] = face_img[py, px][:3]
     return result
 
 def main():
@@ -75,7 +74,8 @@ def main():
     }
     faces = load_faces(face_paths)
     width, height = args.resolution
-    out_img = equirectangular_from_cubemap(faces, width, height)
+    faces_arr = [faces['front'], faces['back'], faces['right'], faces['left'], faces['top'], faces['bottom']]
+    out_img = fast_equirectangular_from_cubemap(faces_arr, width, height)
     Image.fromarray(out_img).save(args.output)
     print(f'Saved: {args.output}')
 
