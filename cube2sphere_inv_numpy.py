@@ -7,38 +7,28 @@ def load_faces(face_paths):
     return {name: np.array(Image.open(path)) for name, path in face_paths.items()}
 
 def direction_to_cube_face(x, y, z):
-    abs_x, abs_y, abs_z = abs(x), abs(y), abs(z)
-    if abs_x >= abs_y and abs_x >= abs_z:
-        # X面
-        if x > 0:
-            face = 'right'
-            u = -z / abs_x
-            v = -y / abs_x
-        else:
-            face = 'left'
-            u = z / abs_x
-            v = -y / abs_x
-    elif abs_y >= abs_x and abs_y >= abs_z:
-        # Y面
-        if y > 0:
-            face = 'front'
-            u = x / abs_y
-            v = -z / abs_y
-        else:
-            face = 'back'
-            u = -x / abs_y
-            v = -z / abs_y
-    else:
-        # Z面
-        if z > 0:
-            face = 'top'
-            u = x / abs_z
-            v = -y / abs_z
-        else:
-            face = 'bottom'
-            u = x / abs_z
-            v = y / abs_z
-    # u,v: [-1,1] → [0,1]
+    # 6面の法線・u軸・v軸定義
+    faces_def = {
+        'front':  {'normal': np.array([0, 1, 0]), 'u': np.array([1, 0, 0]), 'v': np.array([0, 0, -1])},
+        'back':   {'normal': np.array([0, -1, 0]), 'u': np.array([-1, 0, 0]), 'v': np.array([0, 0, -1])},
+        'right':  {'normal': np.array([1, 0, 0]), 'u': np.array([0, -1, 0]), 'v': np.array([0, 0, -1])},
+        'left':   {'normal': np.array([-1, 0, 0]), 'u': np.array([0, 1, 0]), 'v': np.array([0, 0, -1])},
+        'top':    {'normal': np.array([0, 0, 1]), 'u': np.array([1, 0, 0]), 'v': np.array([0, 1, 0])},
+        'bottom': {'normal': np.array([0, 0, -1]), 'u': np.array([1, 0, 0]), 'v': np.array([0, -1, 0])},
+    }
+    p = np.array([x, y, z])
+    max_dot = -np.inf
+    chosen = None
+    for name, fd in faces_def.items():
+        dot = np.dot(p, fd['normal'])
+        if dot > max_dot:
+            max_dot = dot
+            chosen = (name, fd)
+    face, fd = chosen
+    # 平行投影: 面の中心から見て、pのu/v軸方向の座標を取得
+    u = np.dot(p, fd['u'])
+    v = np.dot(p, fd['v'])
+    # u,v: [-1,1] → [0,1]（球体がぴったり収まる前提）
     u = (u + 1) / 2
     v = (v + 1) / 2
     return face, u, v
@@ -53,6 +43,8 @@ def equirectangular_from_cubemap(faces, width, height):
             x = np.sin(theta) * np.cos(phi)
             y = np.sin(theta) * np.sin(phi)
             z = np.cos(theta)
+            # 外側から内側を見たベクトルに変換
+            x, y, z = -x, -y, -z
             # 方向ベクトル→cube face & face座標
             face, u, v = direction_to_cube_face(x, y, z)
             h, w = faces[face].shape[:2]
