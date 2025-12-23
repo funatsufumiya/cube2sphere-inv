@@ -81,15 +81,13 @@ def main():
     width, height = args.resolution
     faces_arr = [faces['front'], faces['back'], faces['right'], faces['left'], faces['top'], faces['bottom']]
     # 6面のフリップ有無パターンを生成
-    names = ["t","b","r","l","f","k"]  # k=back
-    for i in range(64):
-        pattern = [(i >> j) & 1 for j in range(6)]
-        out_img = fast_equirectangular_from_cubemap(faces_arr, width, height, np.array(pattern))
-        # 例: t0b0r0l0f0k0
-        flagstr = ''.join([f"{n}{f}" for n, f in zip(names, pattern)])
-        fname = f"out_{flagstr}.png"
-        Image.fromarray(out_img).save(fname)
-        print(f'Saved: {fname}')
+    # 正解パターンのみ出力
+    pattern = [0,0,1,1,1,0]  # t0b0r1l1f1k0
+    out_img = fast_equirectangular_from_cubemap(faces_arr, width, height, np.array(pattern))
+    # 最終出力を左右反転
+    out_img = np.ascontiguousarray(out_img[:, ::-1, :])
+    Image.fromarray(out_img).save(args.output)
+    print(f'Saved: {args.output}')
 
 if __name__ == '__main__':
     main()
