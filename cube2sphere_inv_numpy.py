@@ -32,10 +32,13 @@ def direction_to_cube_face_numba(x, y, z):
     v = np.dot(p, vs[face_idx])
     u = (u + 1) / 2
     v = (v + 1) / 2
+    # right, left, back だけフリップ
+    if face_idx in (2, 3, 5):
+        u = 1 - u
     return face_idx, u, v
 
 @njit
-def fast_equirectangular_from_cubemap(faces_arr, width, height):
+def fast_equirectangular_from_cubemap(faces_arr, width, height, flip_flags):
     result = np.zeros((height, width, 3), dtype=np.uint8)
     for j in range(height):
         theta = np.pi * (1 - j / height)
@@ -45,6 +48,8 @@ def fast_equirectangular_from_cubemap(faces_arr, width, height):
             y = -np.sin(theta) * np.sin(phi)
             z = -np.cos(theta)
             face_idx, u, v = direction_to_cube_face_numba(x, y, z)
+            if flip_flags[face_idx]:
+                u = 1 - u
             face_img = faces_arr[face_idx]
             h, w = face_img.shape[:2]
             px = min(max(int(u * w), 0), w - 1)
@@ -75,9 +80,16 @@ def main():
     faces = load_faces(face_paths)
     width, height = args.resolution
     faces_arr = [faces['front'], faces['back'], faces['right'], faces['left'], faces['top'], faces['bottom']]
-    out_img = fast_equirectangular_from_cubemap(faces_arr, width, height)
-    Image.fromarray(out_img).save(args.output)
-    print(f'Saved: {args.output}')
+    # 6面のフリップ有無パターンを生成
+    names = ["t","b","r","l","f","k"]  # k=back
+    for i in range(64):
+        pattern = [(i >> j) & 1 for j in range(6)]
+        out_img = fast_equirectangular_from_cubemap(faces_arr, width, height, np.array(pattern))
+        # 例: t0b0r0l0f0k0
+        flagstr = ''.join([f"{n}{f}" for n, f in zip(names, pattern)])
+        fname = f"out_{flagstr}.png"
+        Image.fromarray(out_img).save(fname)
+        print(f'Saved: {fname}')
 
 if __name__ == '__main__':
     main()
