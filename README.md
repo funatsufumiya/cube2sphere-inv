@@ -52,7 +52,7 @@ Supported output formats depend on the Blender installation, but will
 generally include TGA, IRIS, JPEG, MOVIE, IRIZ, RAWTGA, AVIRAW, AVIJPEG,
 PNG, BMP, and FRAMESERVER.
 
-`cube2sphere` can be run in a headless environment (e.g., a server).
+`cube2sphere-inv` can be run in a headless environment (e.g., a server).
 
 Examples
 ========
@@ -67,4 +67,4 @@ This would generate `stitched.tga` in the working directory.
 Installation
 ============
 
-`cube2sphere` can be easily installed with `pip`. It requires a Python 3 installation. (`pip install .`)
+`cube2sphere-inv` can be easily installed with `pip`. It requires a Python 3 installation. (`pip install .`)
